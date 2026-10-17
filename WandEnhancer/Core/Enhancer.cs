@@ -102,9 +102,24 @@ namespace WandEnhancer.Core
             }
         }
 
+        // The aux service keeps its exe open, which blocks the static strategy's rewrite of it.
+        // It may run elevated, so failing to close it is a warning, not a reason to abort.
+        private void TryCloseAuxiliaryService()
+        {
+            try
+            {
+                ProcessTerminator.TryKillProcess($"{_weModConfig.BrandName}AuxiliaryService");
+            }
+            catch (InvalidOperationException e)
+            {
+                _logger($"[ENHANCER] {e.Message}", ELogType.Warn);
+            }
+        }
+
         public void Patch()
         {
             ProcessTerminator.TryKillProcess(_weModConfig.BrandName);
+            TryCloseAuxiliaryService();
             string markerPath = Path.Combine(Path.GetDirectoryName(_asarPath), IncompletePatchMarkerFileName);
             File.WriteAllText(markerPath, string.Empty);
 
@@ -311,6 +326,7 @@ namespace WandEnhancer.Core
             }
 
             ProcessTerminator.TryKillProcess(_weModConfig.BrandName);
+            TryCloseAuxiliaryService();
             AsarSharp.Utils.Extensions.CopyOver(_backupPath, _asarPath);
 
             if (Directory.Exists(_unpackedPath))
