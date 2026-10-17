@@ -37,7 +37,7 @@ WandEnhancer includes a built-in **Remote Web Panel** allowing you to control ap
 - **Page isn't loading?** First, ensure both your PC and phone are connected to the **same local network**. Some routers and guest Wi-Fi networks enable client isolation/AP isolation, which blocks devices on the same SSID from reaching each other. If it still does not load, check Windows Firewall and allow inbound traffic on TCP port `3223` for your local network. If Windows marked your connection as **Public**, switching it to **Private** can also help.
 - **Using mobile data or a different network?** If you want to use the panel over mobile data (LTE/5G) or from an entirely different network, you can use [Tailscale](https://tailscale.com/) or similar VPN tools.
 - The QR code and link carry a random access token. The panel only accepts connections that present it, so other devices on the LAN cannot control the trainer without having seen the QR code. Your phone remembers the token, so it keeps working after Wand restarts.
-- To revoke every paired device, delete `wand-remote-token` from your temp folder (`%TEMP%`) and restart Wand, then scan the new QR code.
+- To revoke every paired device, click **Settings → Remote panel pairing → Reset** in WandEnhancer (or delete `wand-remote-token` from `%TEMP%`), restart Wand and scan the new QR code.
 - The panel still uses plain HTTP on port `3223`, so the token travels unencrypted. Use it only on a trusted LAN/VPN and never expose the port directly to the internet.
 - The panel protocol does not include your Wand bearer token or installation-path fields.
 

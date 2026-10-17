@@ -15,6 +15,9 @@ namespace WandEnhancer
         public static readonly string[] WeModBrandNames = { "Wand", "WeMod" };
         public const string AppSettingsFileName = "appsettings.json";
         public const string AutoPatchConfigFileName = "enhancer.json";
+        // Written by the remote panel bridge into Wand's temp folder; must match
+        // ACCESS_TOKEN_FILE_NAME in web-panel/bridge/src/constants.ts.
+        public const string RemoteAccessTokenFileName = "wand-remote-token";
 
         static Constants()
         {

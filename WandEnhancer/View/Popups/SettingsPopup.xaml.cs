@@ -1,4 +1,6 @@
+using System;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -71,6 +73,26 @@ namespace WandEnhancer.View.Popups
             SettingsManager.SaveSettings(settings);
 #endif
             MainWindow.MainWindow.Instance?.ClosePopup();
+        }
+
+        // The bridge keeps the token it loaded until Wand restarts, so paired phones keep working
+        // until then; the next start writes a new token and only a fresh QR scan pairs again.
+        private void OnResetRemotePairingClick(object sender, RoutedEventArgs e)
+        {
+            string tokenPath = Path.Combine(Path.GetTempPath(), Constants.RemoteAccessTokenFileName);
+            string message;
+            try
+            {
+                File.Delete(tokenPath);
+                message = LocalizationManager.Get("settings_remote_pairing_done");
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                message = LocalizationManager.Format("settings_remote_pairing_failed", ex.Message);
+            }
+
+            RemotePairingStatus.Text = message;
+            RemotePairingStatus.Visibility = Visibility.Visible;
         }
 
         private class LanguageItem

@@ -24,6 +24,10 @@
     <s:String x:Key="settings_language">Language</s:String>
     <s:String x:Key="settings_check_updates">Check for updates on startup</s:String>
     <s:String x:Key="settings_check_prereleases">Also notify about pre-releases</s:String>
+    <s:String x:Key="settings_remote_pairing">Remote panel pairing</s:String>
+    <s:String x:Key="settings_remote_pairing_reset">Reset</s:String>
+    <s:String x:Key="settings_remote_pairing_done">Pairing reset. Restart Wand, then scan the new QR code on every device you want to keep.</s:String>
+    <s:String x:Key="settings_remote_pairing_failed">Could not reset the pairing: {0}</s:String>
     <s:String x:Key="settings_save">Save</s:String>
     <!--#endregion -->
 

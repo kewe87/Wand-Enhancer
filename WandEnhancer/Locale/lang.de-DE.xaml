@@ -21,6 +21,10 @@
     <!--#region Settings -->
     <s:String x:Key="settings_title">Einstellungen</s:String>
     <s:String x:Key="settings_language">Sprache</s:String>
+    <s:String x:Key="settings_remote_pairing">Remote-Kopplung</s:String>
+    <s:String x:Key="settings_remote_pairing_reset">Zurücksetzen</s:String>
+    <s:String x:Key="settings_remote_pairing_done">Kopplung zurückgesetzt. Starte Wand neu und scanne den neuen QR-Code auf jedem Gerät, das verbunden bleiben soll.</s:String>
+    <s:String x:Key="settings_remote_pairing_failed">Kopplung konnte nicht zurückgesetzt werden: {0}</s:String>
     <s:String x:Key="settings_save">Speichern</s:String>
     <!--#endregion -->
 

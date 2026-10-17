@@ -14,6 +14,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         
         <Grid Grid.Row="0" Margin="0 0 0 15">
@@ -58,7 +59,24 @@
             </Grid>
         </StackPanel>
 
-        <Button Grid.Row="2" Padding="0 5 0 5" Margin="0 5 0 0"
+        <StackPanel Grid.Row="2" Margin="0 0 0 15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" VerticalAlignment="Center" Margin="0 0 10 0"
+                           Text="{DynamicResource settings_remote_pairing}" />
+                <Button Grid.Column="1" Padding="10 3 10 3"
+                        Content="{DynamicResource settings_remote_pairing_reset}"
+                        Click="OnResetRemotePairingClick" />
+            </Grid>
+            <TextBlock x:Name="RemotePairingStatus" Margin="0 6 0 0" MaxWidth="250"
+                       TextWrapping="Wrap" FontSize="11" Visibility="Collapsed" />
+        </StackPanel>
+
+        <Button Grid.Row="3" Padding="0 5 0 5" Margin="0 5 0 0"
                 Content="{DynamicResource settings_save}"
                 Click="OnSaveClick" />
     </Grid>
