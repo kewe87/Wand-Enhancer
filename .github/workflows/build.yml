@@ -17,15 +17,20 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: read
+      # Only for the build provenance attestation of the uploaded executable.
+      id-token: write
+      attestations: write
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.17.0
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
           cache: pnpm
@@ -40,11 +45,30 @@ jobs:
             ./build.ps1 -Configuration Release
           }
 
+      - name: Record executable SHA-256
+        shell: pwsh
+        run: |
+          $exe = 'WandEnhancer/bin/Release/WandEnhancer.exe'
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  WandEnhancer.exe" | Out-File -Encoding ascii "$exe.sha256"
+          "### WandEnhancer.exe`n`nSHA-256: ``$hash``" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+
+      # Proves the executable came from this commit and workflow (`gh attestation verify`).
+      # Attestations need a public repository, so a private fork just skips it.
+      - name: Attest build provenance
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: WandEnhancer/bin/Release/WandEnhancer.exe
+
       - name: Upload unsigned executable
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: WandEnhancer-unsigned
-          path: WandEnhancer/bin/Release/WandEnhancer.exe
+          path: |
+            WandEnhancer/bin/Release/WandEnhancer.exe
+            WandEnhancer/bin/Release/WandEnhancer.exe.sha256
           if-no-files-found: error
 
       # The published artifact is always the offline build; this only proves the
