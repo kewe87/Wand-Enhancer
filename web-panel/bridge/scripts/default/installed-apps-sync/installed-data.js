@@ -23,7 +23,10 @@ import {
 export function resolveInstalledData(state) {
     const storeState = getStoreState(state.storeRef);
 
-    if (isRecord(state.installedAppsService?.installedApps)) {
+    // A populated slice is required, not merely a present one: the service starts with an
+    // empty installedApps object and only fills it in refreshApps, so {} must fall through
+    // to the store below.
+    if (isNonEmptyRecord(state.installedAppsService?.installedApps)) {
         return {
             rawInstalledApps: state.installedAppsService.installedApps,
             catalog: isRecord(state.installedAppsService.catalog)
@@ -327,6 +330,10 @@ export function getInstalledVersionsForGame(gameId, data) {
     );
 }
 
+function isNonEmptyRecord(value) {
+    return isRecord(value) && Object.keys(value).length > 0;
+}
+
 function getStoreState(storeRef) {
     const state =
         typeof storeRef?.state?.getValue === 'function' ? storeRef.state.getValue() : null;
@@ -511,17 +518,18 @@ function pickImageUrlForTitle(title, game, preferredApp, sidebarClientIconUrl, v
             : [title, game, preferredApp];
 
     return pickImageUrl(
+        // The client icon CDN wins whenever a Steam AppID resolves, on any platform; it is
+        // null otherwise, so non-Steam titles fall through to their own metadata.
+        getSteamClientIconUrl(
+            findSteamAppId(...steamRoots),
+            getInstalledAppSteamAppId(preferredApp.platform, preferredApp.sku),
+        ),
         title?.imageUrl,
         title?.iconUrl,
         title?.coverUrl,
         title?.thumbnailUrl,
         title?.logoUrl,
         title?.headerImageUrl,
-        getSteamClientIconUrl(
-            findSteamAppId(...steamRoots),
-            getInstalledAppSteamAppId(preferredApp.platform, preferredApp.sku),
-        ),
-        sidebarClientIconUrl,
         title?.images,
         title?.assets,
         game.imageUrl,
@@ -533,5 +541,7 @@ function pickImageUrlForTitle(title, game, preferredApp, sidebarClientIconUrl, v
         game.images,
         game.assets,
         preferredApp.imageUrl,
+        // Scraped from the rendered sidebar: last resort once no metadata exposed artwork.
+        sidebarClientIconUrl,
     );
 }

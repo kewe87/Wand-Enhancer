@@ -97,9 +97,18 @@ import { resolveQrRenderer as findWandQrRenderer } from './remote-popup-cleanup/
             return;
         }
 
+        const linkText = remoteUrl.replace(/\/$/, '');
         for (const anchor of document.querySelectorAll('remote-tooltip a[href]')) {
-            anchor.setAttribute('href', remoteUrl);
-            anchor.textContent = remoteUrl.replace(/\/$/, '');
+            if (anchor.getAttribute('href') !== remoteUrl) {
+                anchor.setAttribute('href', remoteUrl);
+            }
+
+            // Assigning textContent always replaces the text node, which is a childList
+            // record. The observer below watches childList, so an unguarded write would
+            // schedule the next refresh and never settle.
+            if (anchor.textContent !== linkText) {
+                anchor.textContent = linkText;
+            }
         }
     };
 
