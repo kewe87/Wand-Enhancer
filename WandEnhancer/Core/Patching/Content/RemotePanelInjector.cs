@@ -37,7 +37,6 @@ namespace WandEnhancer.Core.Patching.Content
                 return;
             }
 
-            string localCustomScriptsRoot = FindLocalCustomScriptsPath();
             string targetRoot = Path.Combine(_unpackedPath, RemotePanelDirectoryName);
             string targetScriptsRoot = Path.Combine(targetRoot, RemoteRendererScriptsDirectoryName);
             string targetBridgePath = Path.Combine(targetRoot, RemoteBridgeTargetFileName);
@@ -66,9 +65,8 @@ namespace WandEnhancer.Core.Patching.Content
             }
 
             int selectedScriptCount = CopySelectedJavaScriptFiles(customScriptPaths, targetScriptsRoot);
-            int localScriptCount = CopyJavaScriptFiles(localCustomScriptsRoot, targetScriptsRoot);
 
-            _logger($"[ENHANCER] Injected remote panel assets and renderer scripts into app.asar (default: {defaultScriptCount}, selected: {selectedScriptCount}, local: {localScriptCount})", ELogType.Info);
+            _logger($"[ENHANCER] Injected remote panel assets and renderer scripts into app.asar (default: {defaultScriptCount}, selected: {selectedScriptCount})", ELogType.Info);
         }
 
         private static string FindWorkspacePath(params string[] segments)
@@ -86,18 +84,6 @@ namespace WandEnhancer.Core.Patching.Content
             }
 
             throw new FileNotFoundException($"Required workspace artifact not found: {Path.Combine(segments)}");
-        }
-
-        private static int CopyJavaScriptFiles(string sourceDir, string destinationDir)
-        {
-            if (string.IsNullOrEmpty(sourceDir) || !Directory.Exists(sourceDir))
-            {
-                return 0;
-            }
-
-            return CopySelectedJavaScriptFiles(
-                Directory.GetFiles(sourceDir, JavaScriptFileSearchPattern, SearchOption.TopDirectoryOnly),
-                destinationDir);
         }
 
         private static string GetAvailableScriptPath(string destinationDir, string fileName)
@@ -159,16 +145,23 @@ namespace WandEnhancer.Core.Patching.Content
             return resourceNames.Count;
         }
 
-        private static string FindLocalCustomScriptsPath()
+        /// <summary>
+        /// Scripts in the <c>renderer-scripts</c> folder next to the patcher. They are only offered as a
+        /// pre-filled selection in the patch dialog: anything injected into Wand must be visible there and
+        /// deselectable, never picked up silently from disk at patch time.
+        /// </summary>
+        internal static IReadOnlyList<string> FindLocalCustomScripts()
         {
             string executableDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             if (string.IsNullOrEmpty(executableDirectory))
             {
-                return null;
+                return Array.Empty<string>();
             }
 
             string localScripts = Path.Combine(executableDirectory, LocalCustomScriptsDirectoryName);
-            return Directory.Exists(localScripts) ? localScripts : null;
+            return Directory.Exists(localScripts)
+                ? Directory.GetFiles(localScripts, JavaScriptFileSearchPattern, SearchOption.TopDirectoryOnly)
+                : Array.Empty<string>();
         }
 
         private static int CopySelectedJavaScriptFiles(IEnumerable<string> files, string destinationDir)

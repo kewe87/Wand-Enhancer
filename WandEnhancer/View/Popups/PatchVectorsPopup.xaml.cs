@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
+using WandEnhancer.Core.Patching.Content;
 using WandEnhancer.Core.Services;
 using WandEnhancer.Models;
 using WandEnhancer.Utils;
@@ -25,6 +26,11 @@ namespace WandEnhancer.View.Popups
             InitializeComponent();
             ScriptList.ItemsSource = _selectedScripts;
             LoadStrategies();
+            foreach (var path in RemotePanelInjector.FindLocalCustomScripts().Where(WeModInstalls.IsJavaScriptFile))
+            {
+                AddScript(path);
+            }
+
             UpdateScriptsEmptyState();
         }
 

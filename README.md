@@ -74,7 +74,7 @@ You can inject your own JavaScript into Wand at patch time to tweak or fix thing
 **How to add a script**
 
 - In the patch dialog, add one or more `.js` files (only existing `.js` files are accepted), **or**
-- Drop `.js` files into a `renderer-scripts/` folder placed next to the patcher executable.
+- Drop `.js` files into a `renderer-scripts/` folder placed next to the patcher executable. They show up pre-selected in the patch dialog's script list, so you can see and remove each one before patching; nothing from that folder is injected without appearing there.
 
 Then patch as usual — your scripts are bundled into the client and run inside Wand's window.
 
