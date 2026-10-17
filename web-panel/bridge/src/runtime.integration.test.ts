@@ -1,4 +1,7 @@
+import { mkdtempSync } from 'node:fs';
 import { connect, createServer } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { WebSocket as NodeWebSocket } from 'ws';
 
@@ -12,7 +15,7 @@ describe('production bridge runtime', () => {
         ]);
 
         const port = await getFreePort();
-        const runtime = bridge.createBridgeRuntime({ host: '127.0.0.1', port, maxPort: port });
+        const runtime = bridge.createBridgeRuntime(testOptions(port));
         runtime.sync(rawTrainerSnapshot());
         runtime.syncInstalledApps({
             apps: [
@@ -28,7 +31,7 @@ describe('production bridge runtime', () => {
 
         try {
             await waitUntil(() => runtime.listening);
-            const messages = await connectAndCollect(port, 4);
+            const messages = await connectAndCollect(port, tokenOf(runtime), 4);
             expect(messages.map((message) => message.type)).toEqual([
                 'hello_ack',
                 'trainer_meta',
@@ -46,11 +49,11 @@ describe('production bridge runtime', () => {
     it('rejects a browser WebSocket from a different origin', async () => {
         const bridge = require('../../dist/bridge.cjs');
         const port = await getFreePort();
-        const runtime = bridge.createBridgeRuntime({ host: '127.0.0.1', port, maxPort: port });
+        const runtime = bridge.createBridgeRuntime(testOptions(port));
 
         try {
             await waitUntil(() => runtime.listening);
-            await expectUpgradeStatus(port, 403);
+            await expectUpgradeStatus(port, tokenOf(runtime), 403);
         } finally {
             runtime.close();
         }
@@ -59,11 +62,11 @@ describe('production bridge runtime', () => {
     it('allows the local Vite panel to connect to the loopback bridge', async () => {
         const bridge = require('../../dist/bridge.cjs');
         const port = await getFreePort();
-        const runtime = bridge.createBridgeRuntime({ host: '127.0.0.1', port, maxPort: port });
+        const runtime = bridge.createBridgeRuntime(testOptions(port));
 
         try {
             await waitUntil(() => runtime.listening);
-            await expectUpgradeAccepted(port, 'http://127.0.0.1:4173');
+            await expectUpgradeAccepted(port, tokenOf(runtime), 'http://127.0.0.1:4173');
         } finally {
             runtime.close();
         }
@@ -72,12 +75,12 @@ describe('production bridge runtime', () => {
     it('closes an oversized WebSocket frame without buffering its payload', async () => {
         const bridge = require('../../dist/bridge.cjs');
         const port = await getFreePort();
-        const runtime = bridge.createBridgeRuntime({ host: '127.0.0.1', port, maxPort: port });
+        const runtime = bridge.createBridgeRuntime(testOptions(port));
 
         try {
             await waitUntil(() => runtime.listening);
-            await expectSocketClose(port, Buffer.alloc(1024 * 1024 + 1), 1009);
-            await expectDeclaredHugeFrameClose(port, 1009);
+            await expectSocketClose(port, tokenOf(runtime), Buffer.alloc(1024 * 1024 + 1), 1009);
+            await expectDeclaredHugeFrameClose(port, tokenOf(runtime), 1009);
         } finally {
             runtime.close();
         }
@@ -86,13 +89,13 @@ describe('production bridge runtime', () => {
     it('does not trust the HTTP Host header as a URL base', async () => {
         const bridge = require('../../dist/bridge.cjs');
         const port = await getFreePort();
-        const runtime = bridge.createBridgeRuntime({ host: '127.0.0.1', port, maxPort: port });
+        const runtime = bridge.createBridgeRuntime(testOptions(port));
 
         try {
             await waitUntil(() => runtime.listening);
             const malformedHost = await sendRawHttp(
                 port,
-                'GET /remote/api/health HTTP/1.1\r\nHost: [\r\nConnection: close\r\n\r\n',
+                `GET /remote/api/health?token=${tokenOf(runtime)} HTTP/1.1\r\nHost: [\r\nConnection: close\r\n\r\n`,
             );
             expect(malformedHost).toContain('HTTP/1.1 200 OK');
 
@@ -105,7 +108,80 @@ describe('production bridge runtime', () => {
             runtime.close();
         }
     });
+
+    it('requires the access token for the websocket and health endpoint', async () => {
+        const bridge = require('../../dist/bridge.cjs');
+        const port = await getFreePort();
+        const runtime = bridge.createBridgeRuntime(testOptions(port));
+
+        try {
+            await waitUntil(() => runtime.listening);
+            await expectUnauthorizedUpgrade(port, '');
+            await expectUnauthorizedUpgrade(port, '?token=wrong');
+            await expectUnauthorizedUpgrade(port, `?token=${tokenOf(runtime)}x`);
+
+            const health = await sendRawHttp(
+                port,
+                'GET /remote/api/health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n',
+            );
+            expect(health).toContain('HTTP/1.1 401 Unauthorized');
+            expect(health).not.toContain(tokenOf(runtime));
+        } finally {
+            runtime.close();
+        }
+    });
+
+    it('keeps the access token stable across restarts', async () => {
+        const bridge = require('../../dist/bridge.cjs');
+        const port = await getFreePort();
+        const options = testOptions(port);
+        const first = bridge.createBridgeRuntime(options);
+        const token = tokenOf(first);
+        first.close();
+
+        const second = bridge.createBridgeRuntime(options);
+        try {
+            expect(token).toMatch(/^[A-Za-z0-9_-]{22,}$/);
+            expect(tokenOf(second)).toBe(token);
+            expect(second.advertisedUrls.join(' ')).not.toContain(token);
+        } finally {
+            second.close();
+        }
+    });
 });
+
+function testOptions(port: number) {
+    const dir = mkdtempSync(join(tmpdir(), 'wand-bridge-test-'));
+    return {
+        host: '127.0.0.1',
+        port,
+        maxPort: port,
+        logFile: join(dir, 'bridge.log'),
+        tokenFile: join(dir, 'token'),
+    };
+}
+
+function tokenOf(runtime: { remoteUrl: string }): string {
+    return new URL(runtime.remoteUrl).searchParams.get('token') || '';
+}
+
+async function expectUnauthorizedUpgrade(port: number, query: string): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+        const socket = new NodeWebSocket(`ws://127.0.0.1:${port}/remote/ws${query}`);
+        socket.once('open', () =>
+            reject(new Error(`Upgrade without a valid token was accepted (${query}).`)),
+        );
+        socket.once('error', () => undefined);
+        socket.once('unexpected-response', (_request, response) => {
+            response.resume();
+            if (response.statusCode === 401) {
+                resolve();
+            } else {
+                reject(new Error(`Expected HTTP 401, got ${response.statusCode}.`));
+            }
+        });
+    });
+}
 
 async function getFreePort(): Promise<number> {
     return await new Promise((resolve, reject) => {
@@ -119,10 +195,10 @@ async function getFreePort(): Promise<number> {
     });
 }
 
-async function connectAndCollect(port: number, count: number): Promise<any[]> {
+async function connectAndCollect(port: number, token: string, count: number): Promise<any[]> {
     return await new Promise((resolve, reject) => {
         const messages: any[] = [];
-        const socket = new NodeWebSocket(`ws://127.0.0.1:${port}/remote/ws`);
+        const socket = new NodeWebSocket(`ws://127.0.0.1:${port}/remote/ws?token=${token}`);
         socket.once('error', reject);
         socket.once('open', () =>
             socket.send(
@@ -148,9 +224,13 @@ async function connectAndCollect(port: number, count: number): Promise<any[]> {
     });
 }
 
-async function expectUpgradeStatus(port: number, expectedStatus: number): Promise<void> {
+async function expectUpgradeStatus(
+    port: number,
+    token: string,
+    expectedStatus: number,
+): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-        const socket = new NodeWebSocket(`ws://127.0.0.1:${port}/remote/ws`, {
+        const socket = new NodeWebSocket(`ws://127.0.0.1:${port}/remote/ws?token=${token}`, {
             headers: { Origin: 'https://example.com' },
         });
         socket.once('open', () => reject(new Error('Cross-origin WebSocket was accepted.')));
@@ -166,9 +246,9 @@ async function expectUpgradeStatus(port: number, expectedStatus: number): Promis
     });
 }
 
-async function expectUpgradeAccepted(port: number, origin: string): Promise<void> {
+async function expectUpgradeAccepted(port: number, token: string, origin: string): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-        const socket = new NodeWebSocket(`ws://127.0.0.1:${port}/remote/ws`, {
+        const socket = new NodeWebSocket(`ws://127.0.0.1:${port}/remote/ws?token=${token}`, {
             headers: { Origin: origin },
         });
         socket.once('open', () => {
@@ -181,11 +261,12 @@ async function expectUpgradeAccepted(port: number, origin: string): Promise<void
 
 async function expectSocketClose(
     port: number,
+    token: string,
     payload: Buffer,
     expectedCode: number,
 ): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-        const socket = new NodeWebSocket(`ws://127.0.0.1:${port}/remote/ws`);
+        const socket = new NodeWebSocket(`ws://127.0.0.1:${port}/remote/ws?token=${token}`);
         socket.once('open', () => socket.send(payload));
         socket.once('close', (code) =>
             code === expectedCode
@@ -196,9 +277,13 @@ async function expectSocketClose(
     });
 }
 
-async function expectDeclaredHugeFrameClose(port: number, expectedCode: number): Promise<void> {
+async function expectDeclaredHugeFrameClose(
+    port: number,
+    token: string,
+    expectedCode: number,
+): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-        const socket = new NodeWebSocket(`ws://127.0.0.1:${port}/remote/ws`);
+        const socket = new NodeWebSocket(`ws://127.0.0.1:${port}/remote/ws?token=${token}`);
         socket.once('open', () => {
             const header = Buffer.alloc(10);
             header[0] = 0x81;

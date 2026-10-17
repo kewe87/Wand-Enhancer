@@ -7,6 +7,7 @@ This repository patches the Wand Electron app from a .NET Framework WPF desktop 
 ## Remote Web Panel
 
 - The default local remote port is `3223`. Keep bridge and frontend constants aligned; C# must not duplicate the presentation URL or port.
+- The bridge listens on the LAN, so every websocket upgrade and the health endpoint require the access token from `web-panel/bridge/src/access-token.ts` (query param `accessTokenParam` from `web-contract.json`, compared in constant time; 401 otherwise). The token persists in `wand-remote-token` next to the bridge log. Only `__wandRemoteBridgeUrl` (link/QR) carries it; `advertisedUrls` and log lines must stay token-free. The panel stores the token through `shared/storage.ts` and strips it from the address bar. Do not add an unauthenticated path that reaches trainer state or commands.
 - The embedded panel must stay small because the desktop patcher embeds it and then injects it into Wand's `app.asar`.
 - Remote tooltip links and every rendered `remote-qr-code` are redirected by `web-panel/bridge/scripts/default/remote-popup-cleanup.js`. It reuses Wand's loaded QR renderer through the webpack runtime, keeps the local URL visible as a fallback, and hides the Pro onboarding remote mobile app card. Do not reintroduce C# ASAR patches for the tooltip URL or QR component; a changed UI bundle must not make the whole remote-panel patch fail.
 - Production builds must not include mock data, debug routes, sourcemaps, local fonts, heavy icon libraries, or runtime class helper packages.

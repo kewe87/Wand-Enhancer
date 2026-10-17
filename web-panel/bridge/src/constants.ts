@@ -24,6 +24,8 @@ const IPC_CHANNEL = Object.freeze({
 });
 
 module.exports = {
+    ACCESS_TOKEN_FILE_NAME: 'wand-remote-token',
+    ACCESS_TOKEN_PARAM: WEB_CONTRACT.accessTokenParam,
     BRIDGE_LOG_FILE_NAME: 'wand-remote-bridge.log',
     BRIDGE_PROTOCOL_VERSION: WEB_CONTRACT.protocolVersion,
     BRIDGE_SERVER_VERSION: WEB_CONTRACT.serverVersion,

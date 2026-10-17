@@ -31,6 +31,8 @@ export type BridgeClient = {
 
 export type BridgeOptions = {
     logFile?: string;
+    /** Where the remote access token persists; defaults next to the log file. */
+    tokenFile?: string;
     port?: number;
     maxPort?: number;
     host?: string;

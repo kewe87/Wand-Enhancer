@@ -2,6 +2,8 @@ const http = require('node:http');
 const path = require('node:path');
 
 const {
+    ACCESS_TOKEN_FILE_NAME,
+    ACCESS_TOKEN_PARAM,
     BRIDGE_PROTOCOL_VERSION,
     BRIDGE_SERVER_VERSION,
     DEFAULT_REMOTE_HOST,
@@ -13,6 +15,7 @@ const {
     REMOTE_WS_PATH,
     WS_OPCODE,
 } = require('./constants');
+const { isValidAccessToken, loadOrCreateAccessToken, withAccessToken } = require('./access-token');
 const { createBridgeLogger } = require('./logger');
 const { normalizeRemoteCommandAction, normalizeRemoteCommandResult } = require('./normalizers');
 const { createBridgeState } = require('./bridge-state');
@@ -34,6 +37,7 @@ import type { Socket } from 'node:net';
 import type { BridgeClient, BridgeOptions } from './types';
 
 const HTTP_BAD_REQUEST = 400;
+const HTTP_UNAUTHORIZED = 401;
 const HTTP_FORBIDDEN = 403;
 const HTTP_NOT_FOUND = 404;
 
@@ -77,6 +81,10 @@ function createBridgeServer(options: BridgeOptions = {}) {
     const panelRoot = options.panelRoot || path.dirname(__dirname);
     const clients = new Set<BridgeClient>();
     const log = createBridgeLogger(options);
+    const accessToken = loadOrCreateAccessToken(
+        options.tokenFile || path.join(path.dirname(log.file), ACCESS_TOKEN_FILE_NAME),
+        log,
+    );
     let advertisedUrls: string[] = [];
     let setValueHandler: SetValueHandler | null = null;
     let commandHandler: CommandHandler | null = null;
@@ -95,9 +103,12 @@ function createBridgeServer(options: BridgeOptions = {}) {
     function setAdvertisedPort(nextPort: number) {
         port = nextPort;
         advertisedUrls = getAdvertisedUrls(port);
-        globalThis.__wandRemoteBridgeUrl =
+        // Only the URL Wand renders as link/QR carries the token; advertisedUrls stay clean.
+        globalThis.__wandRemoteBridgeUrl = withAccessToken(
             advertisedUrls.find((entry: string) => !entry.includes('localhost')) ||
-            advertisedUrls[0];
+                advertisedUrls[0],
+            accessToken,
+        );
     }
 
     function setHandler(handler: SetValueHandler | null) {
@@ -134,6 +145,14 @@ function createBridgeServer(options: BridgeOptions = {}) {
         }
 
         if (url.pathname === REMOTE_HEALTH_PATH) {
+            if (!isValidAccessToken(accessToken, url.searchParams.get(ACCESS_TOKEN_PARAM))) {
+                response.writeHead(HTTP_UNAUTHORIZED, {
+                    'Content-Type': 'text/plain; charset=utf-8',
+                });
+                response.end('Unauthorized');
+                return;
+            }
+
             response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             response.end(JSON.stringify(bridgeState.buildHealthPayload()));
             return;
@@ -449,6 +468,11 @@ function createBridgeServer(options: BridgeOptions = {}) {
 
         if (!isAllowedWebSocketOrigin(request.headers.origin, request.headers.host)) {
             rejectUpgrade(socket, HTTP_FORBIDDEN, 'Forbidden');
+            return;
+        }
+
+        if (!isValidAccessToken(accessToken, url.searchParams.get(ACCESS_TOKEN_PARAM))) {
+            rejectUpgrade(socket, HTTP_UNAUTHORIZED, 'Unauthorized');
             return;
         }
 
