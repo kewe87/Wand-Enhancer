@@ -168,8 +168,43 @@ namespace AsarSharp.Utils
             {
                 throw new UnauthorizedAccessException($"{e.Message} {DescribeDenial(destination)}", e);
             }
+            catch (IOException e) when (IsSharingViolation(e))
+            {
+                throw new IOException($"{e.Message} {FileLockInfo.DescribeLockers(new[] { destination }) ?? string.Empty}".TrimEnd(), e);
+            }
 
             ClearAttributes(destination);
+        }
+
+        /// <summary>
+        /// Deletes a directory tree. When a file in it is held open - typically a DLL Wand injected into a
+        /// game that is still running - the error names the process holding it instead of only the file.
+        /// </summary>
+        public static void DeleteDirectory(string path)
+        {
+            try
+            {
+                Directory.Delete(path, true);
+            }
+            catch (Exception e) when (e is UnauthorizedAccessException || IsSharingViolation(e))
+            {
+                string lockers = Directory.Exists(path)
+                    ? FileLockInfo.DescribeLockers(Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+                    : null;
+                if (lockers == null)
+                {
+                    throw;
+                }
+
+                throw new IOException($"{e.Message} {lockers}", e);
+            }
+        }
+
+        private static bool IsSharingViolation(Exception e)
+        {
+            const int sharingViolation = unchecked((int)0x80070020);
+            const int lockViolation = unchecked((int)0x80070021);
+            return e is IOException && (e.HResult == sharingViolation || e.HResult == lockViolation);
         }
 
         /// <summary>
@@ -185,6 +220,13 @@ namespace AsarSharp.Utils
             if (!File.Exists(destination))
             {
                 return "The destination does not exist, so the containing folder is refusing new files.";
+            }
+
+            // A DLL mapped into a running process refuses overwrites with "access denied" too.
+            string lockers = FileLockInfo.DescribeLockers(new[] { destination });
+            if (lockers != null)
+            {
+                return lockers;
             }
 
             return $"Attributes {File.GetAttributes(destination)}, owner {DescribeOwner(destination)}, " +

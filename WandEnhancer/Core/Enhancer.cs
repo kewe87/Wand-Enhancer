@@ -144,7 +144,7 @@ namespace WandEnhancer.Core
                 _logger("[ENHANCER] Restoring pristine app.asar.unpacked before patching...", ELogType.Info);
                 if (Directory.Exists(_unpackedPath))
                 {
-                    Directory.Delete(_unpackedPath, true);
+                    AsarSharp.Utils.Extensions.DeleteDirectory(_unpackedPath);
                 }
 
                 AsarSharp.Utils.Extensions.CopyDirectory(_unpackedBackupPath, _unpackedPath);
@@ -298,7 +298,7 @@ namespace WandEnhancer.Core
                 {
                     if (Directory.Exists(_unpackedPath))
                     {
-                        Directory.Delete(_unpackedPath, true);
+                        AsarSharp.Utils.Extensions.DeleteDirectory(_unpackedPath);
                     }
 
                     AsarSharp.Utils.Extensions.CopyDirectory(_unpackedBackupPath, _unpackedPath);
@@ -331,7 +331,7 @@ namespace WandEnhancer.Core
 
             if (Directory.Exists(_unpackedPath))
             {
-                Directory.Delete(_unpackedPath, true);
+                AsarSharp.Utils.Extensions.DeleteDirectory(_unpackedPath);
             }
 
             AsarSharp.Utils.Extensions.CopyDirectory(_unpackedBackupPath, _unpackedPath);
