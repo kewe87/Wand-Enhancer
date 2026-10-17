@@ -206,3 +206,14 @@
         opacity: 0.4;
     }
 }
+
+/* iOS Safari zooms the page when an input under 16px gains focus and does not zoom back.
+   Scoped to iOS so desktop and Android keep the compact type scale. Left unlayered on
+   purpose: that alone outranks the Tailwind utilities layer. */
+@supports (-webkit-touch-callout: none) {
+    input,
+    select,
+    textarea {
+        font-size: max(16px, 1em);
+    }
+}
